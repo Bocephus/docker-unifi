@@ -1,4 +1,41 @@
 services:
+  db-init-script:
+    image: docker.io/mongo:8.0.10
+    entrypoint: ["/bin/sh", "-c"]
+    volumes:
+      - unify_db_init:/docker-entrypoint-initdb.d
+    command:
+      - |
+        cat > /docker-entrypoint-initdb.d/init-mongo.sh <<'EOF'
+        #!/bin/bash
+
+        if which mongosh > /dev/null 2>&1; then
+          mongo_init_bin='mongosh'
+        else
+          mongo_init_bin='mongo'
+        fi
+        "$${mongo_init_bin}" <<INNEREOF
+        use $${MONGO_AUTHSOURCE}
+        db.auth("$${MONGO_INITDB_ROOT_USERNAME}", "$${MONGO_INITDB_ROOT_PASSWORD}")
+        db.createUser({
+          user: "$${MONGO_USER}",
+          pwd: "$${MONGO_PASS}",
+          roles: [
+            "clusterMonitor",
+            { db: "$${MONGO_DBNAME}", role: "dbOwner" },
+            { db: "$${MONGO_DBNAME}_stat", role: "dbOwner" },
+            { db: "$${MONGO_DBNAME}_audit", role: "dbOwner" },
+            { db: "$${MONGO_DBNAME}_restore", role: "dbOwner" }
+          ]
+        })
+        INNEREOF
+        EOF
+        chmod +x /docker-entrypoint-initdb.d/init-mongo.sh
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+
   unifi-db:
     image: docker.io/mongo:8.0.10
     environment:
@@ -12,7 +49,10 @@ services:
       - stack.env
     volumes:
       - unify_db_data:/data/db
-      - unify_db_init:/docker-entrypoint-initdb.d/init-mongo.sh:ro
+      - unify_db_init:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      db-init-script:
+        condition: service_completed_successfully
     deploy:
       replicas: 1
       restart_policy:
