@@ -1,0 +1,95 @@
+services:
+  unifi-db:
+    image: docker.io/mongo:8.0.10
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      MONGO_DBNAME: ${MONGO_DBNAME}
+      MONGO_AUTHSOURCE: ${MONGO_AUTHSOURCE}
+    volumes:
+      - unify_db_data:/data/db
+      - unify_db_init:/docker-entrypoint-initdb.d/init-mongo.sh:ro
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+  unifi-network-application:
+    image: lscr.io/linuxserver/unifi-network-application:latest
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASS: ${MONGO_PASS}
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_PORT: ${MONGO_PORT}
+      MONGO_DBNAME: ${MONGO_DBNAME}
+      MONGO_AUTHSOURCE: ${MONGO_AUTHSOURCE}
+      MEM_LIMIT: ${MEM_LIMIT}
+      MEM_STARTUP: ${MEM_STARTUP}
+    volumes:
+      - unify_net_app_data:/config
+    ports:
+      - target: 8443
+        published: 8443
+        protocol: tcp
+        mode: host
+      - target: 3478
+        published: 3478
+        protocol: udp
+        mode: host
+      - target: 10001
+        published: 10001
+        protocol: udp
+        mode: host
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+      - target: 1900 # optional
+        published: 1900
+        protocol: udp
+        mode: host
+      - target: 8843 # optional
+        published: 8843
+        protocol: tcp
+        mode: host
+      - target: 8880 # optional
+        published: 8880
+        protocol: tcp
+        mode: host
+      - target: 6789 # optional
+        published: 6789
+        protocol: tcp
+        mode: host
+      - target: 5514 # optional
+        published: 5514
+        protocol: udp
+        mode: host
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+
+volumes:
+  unify_db_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=nas01.lab.sal9000.tech,nfsvers=4,rw
+      device: ":/volume1/docker/unifi/db-data"
+  unify_db_init:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=nas01.lab.sal9000.tech,nfsvers=4,rw
+      device: ":/volume1/docker/unifi/db-init"
+  unify_net_app_data:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=nas01.lab.sal9000.tech,nfsvers=4,rw
+      device: ":/volume1/docker/unifi/network-application-config"
